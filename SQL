@@ -1,0 +1,61 @@
+
+*/Question: The above chart shows the number of engaged users each week. Yammer defines engagement as having made some type of server call by interacting with the product (shown in the data as events of type “engagement”). Any point in this chart can be interpreted as “the number of users who logged at least one engagement event during the week starting on that date.”
+
+You are responsible for determining what caused the dip at the end of the chart shown above and, if appropriate, recommending solutions for the problem.*/
+
+--Hypothesis 1: Decline in User Growth
+SELECT DATE_TRUNC('day', e.created_at), 
+      COUNT(DISTINCT e.user_id) as all_users, 
+      COUNT(CASE WHEN e.activated_at IS NOT NULL THEN e.user_id ELSE NULL END) as new_users
+FROM tutorial.yammer_users e
+WHERE e.created_at <'2014-09-03' 
+  AND e.created_at>='2014-06-01'
+GROUP BY 1
+ORDER BY 1
+
+--Hypothesis 2: Decline in Particular Engagement
+SELECT COUNT(DISTINCT user_id), event_name, DATE_TRUNC('week', occurred_at)
+FROM tutorial.yammer_events
+WHERE event_type = 'engagement'
+GROUP BY 2,3
+
+
+--Hypothesis 3: Increase in user count after email campaign
+SELECT COUNT(DISTINCT e.user_id), DATE_TRUNC('week', e.occurred_at)
+FROM tutorial.yammer_events e JOIN tutorial.yammer_emails ee
+ON e.user_id = ee.user_id
+WHERE e.event_type = 'engagement' AND e.event_name = 'login' AND ee.action = 'email_clickthrough'
+GROUP BY 2
+ORDER BY 2
+
+
+--Hypothesis 4: Investigate country usage--lost usage in several countries
+SELECT DATE_TRUNC('week', occurred_at), location, COUNT(DISTINCT user_id)
+FROM tutorial.yammer_events
+WHERE event_type = 'engagement' AND occurred_at<'2015-01-01' AND occurred_at>'2013-12-31'  
+GROUP BY 1,2
+
+--Hypothesis 5: Investigate device usage
+SELECT DATE_TRUNC('week', e.occurred_at), COUNT(DISTINCT e.user_id) as weekly_users, 
+      COUNT(DISTINCT CASE WHEN e.device IN ('macbook pro','lenovo thinkpad','macbook air','dell inspiron notebook',
+          'asus chromebook','dell inspiron desktop','acer aspire notebook','hp pavilion desktop','acer aspire desktop','mac mini')
+          THEN e.user_id ELSE NULL END) AS computer,
+       COUNT(DISTINCT CASE WHEN e.device IN ('iphone 5','samsung galaxy s4','nexus 5','iphone 5s','iphone 4s','nokia lumia 635',
+       'htc one','samsung galaxy note','amazon fire phone') THEN e.user_id ELSE NULL END) AS phone,
+        COUNT(DISTINCT CASE WHEN e.device IN ('ipad air','nexus 7','ipad mini','nexus 10','kindle fire','windows surface',
+        'samsumg galaxy tablet') THEN e.user_id ELSE NULL END) AS tablet
+FROM tutorial.yammer_events e
+WHERE e.event_type = 'engagement' AND e.event_name = 'login'  
+GROUP BY 1
+ORDER BY 1
+
+--Hypothesis 5: Investigate device usage by type of email sent by date
+SELECT DATE_TRUNC('week', e.occurred_at), COUNT(DISTINCT e.user_id) as weekly_users, 
+       COUNT(DISTINCT CASE WHEN e.device IN ('iphone 5','samsung galaxy s4','nexus 5','iphone 5s','iphone 4s','nokia lumia 635',
+       'htc one','samsung galaxy note','amazon fire phone') THEN e.user_id ELSE NULL END) AS phone,
+       y.action
+FROM tutorial.yammer_events e JOIN tutorial.yammer_emails y
+    ON e.user_id = y.user_id
+WHERE e.event_type = 'engagement' AND e.event_name = 'login'  
+GROUP BY 4,1
+ORDER BY 1
